@@ -1,0 +1,109 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+import warnings
+warnings.filterwarnings('ignore')
+
+# Загрузка данных
+transactions = pd.read_csv('transaction_fraud_data.csv')
+exchange_rates = pd.read_csv('historical_currency_exchange.csv')
+
+# Базовый обзор данных транзакций
+print("Обзор данных транзакций:")
+print(f"Размер датасета: {transactions.shape}")
+print(transactions.info())
+print("\nПервые 5 строк:")
+print(transactions.head())
+print("\nСтатистика:")
+print(transactions.describe())
+print("\nКоличество мошеннических транзакций:")
+print(transactions['is_fraud'].value_counts())
+print(f"Процент мошенничества: {transactions['is_fraud'].mean() * 100:.2f}%")
+
+# Базовый обзор данных обменных курсов
+print("\nОбзор данных обменных курсов:")
+print(f"Размер датасета: {exchange_rates.shape}")
+print(exchange_rates.info())
+print("\nПервые 5 строк:")
+print(exchange_rates.head())
+
+# Анализ транзакций по времени
+if 'transaction_date' in transactions.columns:
+    transactions['transaction_date'] = pd.to_datetime(transactions['transaction_date'])
+    transactions['hour'] = transactions['transaction_date'].dt.hour
+    transactions['day'] = transactions['transaction_date'].dt.day
+    transactions['month'] = transactions['transaction_date'].dt.month
+    
+    # Распределение транзакций по времени суток
+    plt.figure(figsize=(12, 6))
+    sns.countplot(x='hour', data=transactions, hue='is_fraud')
+    plt.title('Распределение транзакций по часам')
+    plt.xlabel('Час')
+    plt.ylabel('Количество транзакций')
+    plt.show()
+
+# Анализ по суммам транзакций
+plt.figure(figsize=(12, 6))
+sns.histplot(data=transactions, x='amount', hue='is_fraud', bins=50, log_scale=True)
+plt.title('Распределение сумм транзакций')
+plt.xlabel('Сумма транзакции (логарифмическая шкала)')
+plt.ylabel('Количество')
+plt.show()
+
+# Анализ по валютам (если есть)
+if 'currency' in transactions.columns:
+    plt.figure(figsize=(12, 6))
+    fraud_by_currency = transactions.groupby('currency')['is_fraud'].mean().sort_values(ascending=False)
+    fraud_by_currency.plot(kind='bar')
+    plt.title('Процент мошенничества по валютам')
+    plt.xlabel('Валюта')
+    plt.ylabel('% мошеннических транзакций')
+    plt.show()
+
+# Корреляционный анализ числовых признаков
+numeric_cols = transactions.select_dtypes(include=[np.number]).columns
+plt.figure(figsize=(12, 10))
+sns.heatmap(transactions[numeric_cols].corr(), annot=True, cmap='coolwarm')
+plt.title('Корреляция между числовыми признаками')
+plt.show()
+
+# Анализ обменных курсов во времени (если есть даты)
+if 'date' in exchange_rates.columns:
+    exchange_rates['date'] = pd.to_datetime(exchange_rates['date'])
+    
+    # Выберем несколько основных валют для визуализации
+    main_currencies = ['USD', 'EUR', 'GBP', 'JPY']
+    plt.figure(figsize=(14, 7))
+    
+    for currency in main_currencies:
+        if currency in exchange_rates.columns:
+            plt.plot(exchange_rates['date'], exchange_rates[currency], label=currency)
+    
+    plt.title('Динамика обменных курсов')
+    plt.xlabel('Дата')
+    plt.ylabel('Курс')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+# Объединение данных (если возможно)
+# Предположим, что в обоих датасетах есть общие даты и валюты
+if 'transaction_date' in transactions.columns and 'date' in exchange_rates.columns and 'currency' in transactions.columns:
+    # Пример объединения - может потребоваться корректировка в зависимости от структуры данных
+    transactions['transaction_date'] = pd.to_datetime(transactions['transaction_date']).dt.date
+    exchange_rates['date'] = pd.to_datetime(exchange_rates['date']).dt.date
+    
+    # Анализ мошенничества в зависимости от колебаний курса
+    # Это упрощенный пример, который нужно адаптировать к реальной структуре данных
+    merged_data = pd.merge(
+        transactions, 
+        exchange_rates, 
+        left_on='transaction_date', 
+        right_on='date', 
+        how='left'
+    )
+    
+    print("\nАнализ связи мошенничества с курсами валют:")
+    print(merged_data.groupby('is_fraud')[main_currencies].mean())
